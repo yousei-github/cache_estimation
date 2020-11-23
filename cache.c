@@ -9,6 +9,7 @@
 #define BASIC_CYCLE (4)
 #define MIN_KB (1)
 #define MAX_MB (128)
+#define EXPERIMENT_TIME (10)
 
 // internel use
 #define PRECISION (100)
@@ -18,7 +19,7 @@
 #define MB (SCALE * SCALE)
 #define LIST_SIZE_B (POINTER_SIZE_B + NPAD * LINT_SIZE_B)
 #define ARRAY_LENGTH (MAX_MB * MB / LIST_SIZE_B)
-#define CALCULATION_MULTIPLE (1000000 * (NPAD + 1))
+#define CALCULATION_MULTIPLE (1000000 * (NPAD / 4 + 1))
 #define NANO_PER_SECOUND (1000000000)
 //#define ARRAY_LENGTH (MIN_KB * KB / LIST_SIZE_B)
 
@@ -54,48 +55,59 @@ int main()
   struct list *head = NULL;
   volatile struct list *read;
 
+  FILE *fd1 = fopen("Data.txt", "w");
+
+  //printf("fd1 is [%d]\n", fd1);
+  fprintf(fd1, "NPAD is [%d]:\n", NPAD);
+
   printf("SCALE is [%d], ARRAY_LENGTH is [%d], LIST_SIZE_B is [%d]\n", SCALE, ARRAY_LENGTH, LIST_SIZE_B);
   printf("int is [%ld], long int is [%ld], pointer (struct list *) is [%ld], sizeof(struct list) is [%ld]\n",
          sizeof(int), sizeof(long int), sizeof(struct list *), sizeof(struct list));
 
   head = list_initialization(head, ARRAY_LENGTH);
 
-  for (uint i = MIN_KB; i <= MAX_MB * SCALE; i = i * 2)
+  for (uint count = 0; count < EXPERIMENT_TIME; count++)
   {
-    max_multiple = 1 + CALCULATION_MULTIPLE / i;
-    list_read_elements = i * SCALE / LIST_SIZE_B;
-
-    // here to keep the cache have same content before start each test
-    head = list_set(head, ARRAY_LENGTH, i);
-
-    start = clock();
-    for (uint time = 0; time < max_multiple; time++)
+    printf("Experiment_time is %d:\n", count + 1);
+    fprintf(fd1, "Experiment_time is %d:\n", count + 1);
+    _sleep(10);
+    for (uint i = MIN_KB; i <= MAX_MB * SCALE; i = i * 2)
     {
-      read = head;
-      for (uint j = 0; j < list_read_elements; j++)
+      max_multiple = 1 + CALCULATION_MULTIPLE / i;
+      list_read_elements = i * SCALE / LIST_SIZE_B;
+
+      // here to keep the cache have same content before start each test
+      head = list_set(head, ARRAY_LENGTH, i);
+
+      start = clock();
+      for (uint time = 0; time < max_multiple; time++)
       {
-        read = read->next;
+        read = head;
+        for (uint j = 0; j < list_read_elements; j++)
+        {
+          read = read->next;
+        }
       }
-    }
-    stop = clock();
-    
+      stop = clock();
 
-    spend_time = ((double)(stop - start)) / CLOCKS_PER_SEC;
-    spend_time_per_read = (spend_time * NANO_PER_SECOUND) / max_multiple / list_read_elements;
-    if (i == MIN_KB)
-    {
-      min_spend_time = spend_time;
-      min_spend_time_per_read = spend_time_per_read;
-    }
-    //cycle = (uint)(spend_time_per_read * BASIC_CYCLE / min_spend_time_per_read);
-    //cycle = (((spend_time_per_read * PRECISION / min_spend_time_per_read) - PRECISION) / ZOOM_OUT) + BASIC_CYCLE;
-    cycle = (spend_time_per_read - min_spend_time_per_read) * ZOOM_OUT + BASIC_CYCLE;
-    //cycle = (spend_time_per_read - min_spend_time_per_read) / 0.1 + BASIC_CYCLE;
+      spend_time = ((double)(stop - start)) / CLOCKS_PER_SEC;
+      spend_time_per_read = (spend_time * NANO_PER_SECOUND) / max_multiple / list_read_elements;
+      if (i == MIN_KB)
+      {
+        min_spend_time = spend_time;
+        min_spend_time_per_read = spend_time_per_read;
+      }
+      //cycle = (uint)(spend_time_per_read * BASIC_CYCLE / min_spend_time_per_read);
+      //cycle = (((spend_time_per_read * PRECISION / min_spend_time_per_read) - PRECISION) / ZOOM_OUT) + BASIC_CYCLE;
+      cycle = (spend_time_per_read - min_spend_time_per_read) * ZOOM_OUT + BASIC_CYCLE;
+      //cycle = (spend_time_per_read - min_spend_time_per_read) / 0.1 + BASIC_CYCLE;
 
-    //printf("%dKB: spend_time is [%.8fs], cycle is [%d], spend_time_per_read is [%.3fns] \n", i, spend_time, cycle - BASIC_CYCLE, spend_time_per_read);
-    printf("%dKB: spend_time is [%.8fs], cycle is [%f], spend_time_per_read is [%.3f]ns \n", i, spend_time, cycle, spend_time_per_read);
+      //printf("%dKB: spend_time is [%.8fs], cycle is [%d], spend_time_per_read is [%.3fns] \n", i, spend_time, cycle - BASIC_CYCLE, spend_time_per_read);
+      printf("%dKB: spend_time is [%.8fs], cycle is [%f], spend_time_per_read is [%.3f]ns \n", i, spend_time, cycle, spend_time_per_read);
+      fprintf(fd1, "%f %.3f\n", cycle, spend_time_per_read);
+    }
   }
-
+  fclose(fd1);
   return 0;
 }
 
